@@ -1,7 +1,7 @@
 package ru.yandex.practicum.filmorate.exception;
 
-public class DublicatedDataException extends RuntimeException {
-    public DublicatedDataException(String message) {
+public class DuplicatedDataException extends RuntimeException {
+    public DuplicatedDataException(String message) {
         super(message);
     }
 }
