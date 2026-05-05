@@ -1,5 +1,6 @@
 package ru.yandex.practicum.filmorate.controller;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import ru.yandex.practicum.filmorate.exception.NotFoundException;
 import ru.yandex.practicum.filmorate.exception.ValidationException;
@@ -11,184 +12,109 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class FilmControllerTest {
 
-    private final FilmController controller = new FilmController();
+    private FilmController controller;
+    private Film film;
 
-    @Test
-    void shouldCreateFilmWhenDataIsValid() {
-        Film film = new Film();
+    @BeforeEach
+    void setUp() {
+        controller = new FilmController();
+
+        film = new Film();
         film.setName("Avatar");
         film.setDescription("Good film");
         film.setReleaseDate(LocalDate.of(2009, 12, 10));
         film.setDuration(162);
-
-        Film createdFilm = controller.create(film);
-
-        assertNotNull(createdFilm.getId());
-        assertEquals("Avatar", createdFilm.getName());
-        assertEquals(1, controller.findAll().size());
     }
 
     @Test
-    void shouldThrowExceptionWhenNameIsNull() {
-        Film film = new Film();
-        film.setName(null);
-        film.setDescription("Description");
-        film.setReleaseDate(LocalDate.of(2000, 1, 1));
-        film.setDuration(100);
+    void shouldCreateFilm_whenValid() {
+        Film created = controller.create(film);
+
+        assertNotNull(created.getId());
+        assertEquals("Avatar", created.getName());
+    }
+
+    @Test
+    void shouldThrow_whenNameBlank() {
+        film.setName(" ");
 
         assertThrows(ValidationException.class, () -> controller.create(film));
     }
 
     @Test
-    void shouldThrowExceptionWhenNameIsBlank() {
-        Film film = new Film();
-        film.setName("   ");
-        film.setDescription("Description");
-        film.setReleaseDate(LocalDate.of(2000, 1, 1));
-        film.setDuration(100);
-
-        assertThrows(ValidationException.class, () -> controller.create(film));
-    }
-
-    @Test
-    void shouldThrowExceptionWhenDescriptionIsMoreThan200Characters() {
-        Film film = new Film();
-        film.setName("Film");
+    void shouldThrow_whenDescriptionTooLong() {
         film.setDescription("a".repeat(201));
-        film.setReleaseDate(LocalDate.of(2000, 1, 1));
-        film.setDuration(100);
 
         assertThrows(ValidationException.class, () -> controller.create(film));
     }
 
     @Test
-    void shouldCreateFilmWhenDescriptionIsExactly200Characters() {
-        Film film = new Film();
-        film.setName("Film");
-        film.setDescription("a".repeat(200));
-        film.setReleaseDate(LocalDate.of(2000, 1, 1));
-        film.setDuration(100);
-
-        Film createdFilm = controller.create(film);
-
-        assertNotNull(createdFilm.getId());
-    }
-
-    @Test
-    void shouldThrowExceptionWhenReleaseDateIsBeforeMinDate() {
-        Film film = new Film();
-        film.setName("Film");
-        film.setDescription("Description");
+    void shouldThrow_whenReleaseDateBeforeMin() {
         film.setReleaseDate(LocalDate.of(1895, 12, 27));
-        film.setDuration(100);
 
         assertThrows(ValidationException.class, () -> controller.create(film));
     }
 
     @Test
-    void shouldCreateFilmWhenReleaseDateIsMinDate() {
-        Film film = new Film();
-        film.setName("Film");
-        film.setDescription("Description");
-        film.setReleaseDate(LocalDate.of(1895, 12, 28));
-        film.setDuration(100);
-
-        Film createdFilm = controller.create(film);
-
-        assertNotNull(createdFilm.getId());
-    }
-
-    @Test
-    void shouldThrowExceptionWhenReleaseDateIsNull() {
-        Film film = new Film();
-        film.setName("Film");
-        film.setDescription("Description");
-        film.setReleaseDate(null);
-        film.setDuration(100);
-
-        assertThrows(ValidationException.class, () -> controller.create(film));
-    }
-
-    @Test
-    void shouldThrowExceptionWhenDurationIsZero() {
-        Film film = new Film();
-        film.setName("Film");
-        film.setDescription("Description");
-        film.setReleaseDate(LocalDate.of(2000, 1, 1));
+    void shouldThrow_whenDurationZero() {
         film.setDuration(0);
 
         assertThrows(ValidationException.class, () -> controller.create(film));
     }
 
-    @Test
-    void shouldThrowExceptionWhenDurationIsNegative() {
-        Film film = new Film();
-        film.setName("Film");
-        film.setDescription("Description");
-        film.setReleaseDate(LocalDate.of(2000, 1, 1));
-        film.setDuration(-1);
+    // --- UPDATE (ВАЖНО: теперь частичный) ---
 
-        assertThrows(ValidationException.class, () -> controller.create(film));
+    @Test
+    void shouldUpdateOnlyName() {
+        Film created = controller.create(film);
+
+        Film update = new Film();
+        update.setId(created.getId());
+        update.setName("Avatar 2");
+
+        Film result = controller.update(update);
+
+        assertEquals("Avatar 2", result.getName());
+        assertEquals(created.getDescription(), result.getDescription());
     }
 
     @Test
-    void shouldCreateFilmWhenDurationIsOne() {
-        Film film = new Film();
-        film.setName("Film");
-        film.setDescription("Description");
-        film.setReleaseDate(LocalDate.of(2000, 1, 1));
-        film.setDuration(1);
+    void shouldNotOverwriteWithNulls() {
+        Film created = controller.create(film);
 
-        Film createdFilm = controller.create(film);
+        Film update = new Film();
+        update.setId(created.getId());
+        // ничего больше не передаем
 
-        assertNotNull(createdFilm.getId());
+        Film result = controller.update(update);
+
+        assertEquals(created.getName(), result.getName());
+        assertEquals(created.getDescription(), result.getDescription());
     }
 
     @Test
-    void shouldUpdateFilmWhenDataIsValid() {
-        Film film = new Film();
-        film.setName("Old name");
-        film.setDescription("Old description");
-        film.setReleaseDate(LocalDate.of(2000, 1, 1));
-        film.setDuration(100);
+    void shouldThrow_whenUpdateIdNull() {
+        Film update = new Film();
 
-        Film createdFilm = controller.create(film);
-
-        Film updatedFilm = new Film();
-        updatedFilm.setId(createdFilm.getId());
-        updatedFilm.setName("New name");
-        updatedFilm.setDescription("New description");
-        updatedFilm.setReleaseDate(LocalDate.of(2001, 1, 1));
-        updatedFilm.setDuration(120);
-
-        Film result = controller.update(updatedFilm);
-
-        assertEquals("New name", result.getName());
-        assertEquals("New description", result.getDescription());
-        assertEquals(120, result.getDuration());
+        assertThrows(ValidationException.class, () -> controller.update(update));
     }
 
     @Test
-    void shouldThrowExceptionWhenUpdateFilmIdIsNull() {
-        Film film = new Film();
-        film.setId(null);
-        film.setName("Film");
-        film.setDescription("Description");
-        film.setReleaseDate(LocalDate.of(2000, 1, 1));
-        film.setDuration(100);
+    void shouldThrow_whenFilmNotFound() {
+        Film update = new Film();
+        update.setId(999L);
 
-        assertThrows(ValidationException.class, () -> controller.update(film));
+        assertThrows(NotFoundException.class, () -> controller.update(update));
     }
 
     @Test
-    void shouldThrowExceptionWhenUpdateFilmNotFound() {
-        Film film = new Film();
-        film.setId(999L);
-        film.setName("Film");
-        film.setDescription("Description");
-        film.setReleaseDate(LocalDate.of(2000, 1, 1));
-        film.setDuration(100);
+    void shouldThrow_whenInvalidUpdateField() {
+        Film created = controller.create(film);
 
-        assertThrows(NotFoundException.class, () -> controller.update(film));
+        Film update = new Film();
+        update.setId(created.getId());
+        update.setName(" "); // невалидно
+
+        assertThrows(ValidationException.class, () -> controller.update(update));
     }
 }

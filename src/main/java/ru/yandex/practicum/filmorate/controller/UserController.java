@@ -25,7 +25,7 @@ public class UserController {
 
     @PostMapping
     public User create(@RequestBody User user) {
-        validateUser(user);
+        validateUserForCreate(user);
 
         String email = user.getEmail();
         String login = user.getLogin();
@@ -63,25 +63,37 @@ public class UserController {
             throw new NotFoundException("Пользователь с id = " + id + " не найден");
         }
 
-        validateUser(newUser);
+        validateUserForUpdate(newUser);
 
-        if (users.values().stream()
-                .anyMatch(savedUser -> !savedUser.getId().equals(id)
-                        && savedUser.getEmail().equals(newUser.getEmail()))) {
+        if (newUser.getEmail() != null &&
+                users.values().stream()
+                        .anyMatch(savedUser -> !savedUser.getId().equals(id)
+                                && savedUser.getEmail().equals(newUser.getEmail()))) {
+
             log.warn("Ошибка обновления пользователя: email уже используется, email={}", newUser.getEmail());
             throw new DuplicatedDataException("Этот email уже используется");
         }
 
         User oldUser = users.get(id);
 
-        oldUser.setEmail(newUser.getEmail());
-        oldUser.setLogin(newUser.getLogin());
-        oldUser.setBirthday(newUser.getBirthday());
+        if (newUser.getEmail() != null) {
+            oldUser.setEmail(newUser.getEmail());
+        }
 
-        if (newUser.getName() == null || newUser.getName().isBlank()) {
-            oldUser.setName(newUser.getLogin());
-        } else {
-            oldUser.setName(newUser.getName());
+        if (newUser.getLogin() != null) {
+            oldUser.setLogin(newUser.getLogin());
+        }
+
+        if (newUser.getBirthday() != null) {
+            oldUser.setBirthday(newUser.getBirthday());
+        }
+
+        if (newUser.getName() != null) {
+            if (newUser.getName().isBlank()) {
+                oldUser.setName(oldUser.getLogin());
+            } else {
+                oldUser.setName(newUser.getName());
+            }
         }
 
         log.info("Обновлён пользователь: id={}, email={}, login={}",
@@ -90,7 +102,7 @@ public class UserController {
         return oldUser;
     }
 
-    private void validateUser(User user) {
+    private void validateUserForCreate(User user) {
         String email = user.getEmail();
         String login = user.getLogin();
         LocalDate birthday = user.getBirthday();
@@ -108,6 +120,33 @@ public class UserController {
         if (birthday == null || birthday.isAfter(LocalDate.now())) {
             log.warn("Ошибка валидации пользователя: некорректная дата рождения={}", birthday);
             throw new ValidationException("Дата рождения не может быть в будущем");
+        }
+    }
+
+    private void validateUserForUpdate(User user) {
+        String email = user.getEmail();
+        String login = user.getLogin();
+        LocalDate birthday = user.getBirthday();
+
+        if (email != null) {
+            if (email.isBlank() || !email.contains("@")) {
+                log.warn("Ошибка валидации пользователя: некорректный email={}", email);
+                throw new ValidationException("Некорректный email");
+            }
+        }
+
+        if (login != null) {
+            if (login.isBlank() || login.contains(" ")) {
+                log.warn("Ошибка валидации пользователя: некорректный login={}", login);
+                throw new ValidationException("Некорректный login");
+            }
+        }
+
+        if (birthday != null) {
+            if (birthday.isAfter(LocalDate.now())) {
+                log.warn("Ошибка валидации пользователя: некорректная дата рождения={}", birthday);
+                throw new ValidationException("Дата рождения не может быть в будущем");
+            }
         }
     }
 
