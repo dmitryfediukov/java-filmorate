@@ -141,14 +141,12 @@ class SocialApiTest {
     @Test
     void cannotInjectFriendsOrLikesThroughJson() throws Exception {
         mvc.perform(post("/users").contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {"email":"test@mail.ru","login":"test","birthday":"2000-01-01","friends":[999]}
-                                """))
+                        .content("{\"email\":\"test@mail.ru\",\"login\":\"test\","
+                                + "\"birthday\":\"2000-01-01\",\"friends\":[999]}"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.friends", hasSize(0)));
         mvc.perform(post("/films").contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {"name":"test","releaseDate":"2000-01-01","duration":100,"likes":[999]}
-                                """))
+                        .content("{\"name\":\"test\",\"releaseDate\":\"2000-01-01\","
+                                + "\"duration\":100,\"likes\":[999]}"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.likes", hasSize(0)));
     }
 
