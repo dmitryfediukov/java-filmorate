@@ -36,8 +36,7 @@ public class FilmService {
     }
 
     public Film create(Film film) {
-        validateFilmForCreate(film);
-        film.getLikes().clear();
+        validateFilm(film, true);
         Film created = filmStorage.create(film);
         log.info("Создан фильм: id={}", created.getId());
         return created;
@@ -48,7 +47,7 @@ public class FilmService {
             throw new ValidationException("Id должен быть указан");
         }
         filmStorage.findById(film.getId());
-        validateFilmForUpdate(film);
+        validateFilm(film, false);
         Film updated = filmStorage.update(film);
         log.info("Обновлён фильм: id={}", updated.getId());
         return updated;
@@ -80,8 +79,9 @@ public class FilmService {
                 .toList();
     }
 
-    private void validateFilmForCreate(Film film) {
-        if (film.getName() == null || film.getName().isBlank()) {
+    private void validateFilm(Film film, boolean isCreate) {
+        if ((isCreate && film.getName() == null)
+                || (film.getName() != null && film.getName().isBlank())) {
             log.warn("Ошибка валидации фильма: название пустое");
             throw new ValidationException("Название не может быть пустым");
         }
@@ -92,38 +92,14 @@ public class FilmService {
             throw new ValidationException("Максимальная длина описания — 200 символов");
         }
 
-        if (film.getReleaseDate() == null || film.getReleaseDate().isBefore(MIN_RELEASE_DATE)) {
+        if ((isCreate && film.getReleaseDate() == null)
+                || (film.getReleaseDate() != null && film.getReleaseDate().isBefore(MIN_RELEASE_DATE))) {
             log.warn("Ошибка валидации фильма: некорректная дата релиза, releaseDate={}",
                     film.getReleaseDate());
             throw new ValidationException("Дата релиза не может быть раньше 28 декабря 1895 года");
         }
 
-        if (film.getDuration() < 1) {
-            log.warn("Ошибка валидации фильма: продолжительность должна быть положительной, duration={}",
-                    film.getDuration());
-            throw new ValidationException("Продолжительность фильма должна быть положительным числом");
-        }
-    }
-
-    private void validateFilmForUpdate(Film film) {
-        if (film.getName() != null && film.getName().isBlank()) {
-            log.warn("Ошибка валидации фильма: название пустое");
-            throw new ValidationException("Название не может быть пустым");
-        }
-
-        if (film.getDescription() != null && film.getDescription().length() > 200) {
-            log.warn("Ошибка валидации фильма: описание длиннее 200 символов, length={}",
-                    film.getDescription().length());
-            throw new ValidationException("Максимальная длина описания — 200 символов");
-        }
-
-        if (film.getReleaseDate() != null && film.getReleaseDate().isBefore(MIN_RELEASE_DATE)) {
-            log.warn("Ошибка валидации фильма: некорректная дата релиза, releaseDate={}",
-                    film.getReleaseDate());
-            throw new ValidationException("Дата релиза не может быть раньше 28 декабря 1895 года");
-        }
-
-        if (film.getDuration() != 0 && film.getDuration() < 1) {
+        if (isCreate ? film.getDuration() < 1 : film.getDuration() < 0) {
             log.warn("Ошибка валидации фильма: продолжительность должна быть положительной, duration={}",
                     film.getDuration());
             throw new ValidationException("Продолжительность фильма должна быть положительным числом");

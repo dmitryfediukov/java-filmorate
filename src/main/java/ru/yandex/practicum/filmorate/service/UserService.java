@@ -36,7 +36,6 @@ public class UserService {
         if (user.getName() == null || user.getName().isBlank()) {
             user.setName(user.getLogin());
         }
-        user.getFriends().clear();
         User created = userStorage.create(user);
         log.info("Создан пользователь: id={}", created.getId());
         return created;
