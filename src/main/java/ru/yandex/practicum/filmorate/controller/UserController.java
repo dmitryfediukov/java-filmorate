@@ -1,162 +1,60 @@
 package ru.yandex.practicum.filmorate.controller;
 
-import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
-import ru.yandex.practicum.filmorate.exception.DuplicatedDataException;
-import ru.yandex.practicum.filmorate.exception.NotFoundException;
-import ru.yandex.practicum.filmorate.exception.ValidationException;
 import ru.yandex.practicum.filmorate.model.User;
+import ru.yandex.practicum.filmorate.service.UserService;
 
-import java.time.LocalDate;
 import java.util.Collection;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.List;
 
-@Slf4j
 @RestController
 @RequestMapping("/users")
 public class UserController {
-    private final Map<Long, User> users = new HashMap<>();
+    private final UserService userService;
+
+    @Autowired
+    public UserController(UserService userService) {
+        this.userService = userService;
+    }
 
     @GetMapping
     public Collection<User> findAll() {
-        return users.values();
+        return userService.findAll();
+    }
+
+    @GetMapping("/{id}")
+    public User findById(@PathVariable long id) {
+        return userService.findById(id);
     }
 
     @PostMapping
     public User create(@RequestBody User user) {
-        validateUserForCreate(user);
-
-        String email = user.getEmail();
-        String login = user.getLogin();
-
-        if (users.values().stream()
-                .anyMatch(savedUser -> savedUser.getEmail().equals(email))) {
-            log.warn("Ошибка создания пользователя: email уже используется, email={}", email);
-            throw new DuplicatedDataException("Этот email уже используется");
-        }
-
-        if (user.getName() == null || user.getName().isBlank()) {
-            user.setName(login);
-        }
-
-        user.setId(getNextId());
-        users.put(user.getId(), user);
-
-        log.info("Создан пользователь: id={}, email={}, login={}",
-                user.getId(), user.getEmail(), user.getLogin());
-
-        return user;
+        return userService.create(user);
     }
 
     @PutMapping
-    public User update(@RequestBody User newUser) {
-        Long id = newUser.getId();
-
-        if (id == null) {
-            log.warn("Ошибка обновления пользователя: id не указан");
-            throw new ValidationException("Id должен быть указан");
-        }
-
-        if (!users.containsKey(id)) {
-            log.warn("Ошибка обновления пользователя: пользователь с id={} не найден", id);
-            throw new NotFoundException("Пользователь с id = " + id + " не найден");
-        }
-
-        validateUserForUpdate(newUser);
-
-        if (newUser.getEmail() != null &&
-                users.values().stream()
-                        .anyMatch(savedUser -> !savedUser.getId().equals(id)
-                                && savedUser.getEmail().equals(newUser.getEmail()))) {
-
-            log.warn("Ошибка обновления пользователя: email уже используется, email={}", newUser.getEmail());
-            throw new DuplicatedDataException("Этот email уже используется");
-        }
-
-        User oldUser = users.get(id);
-
-        if (newUser.getEmail() != null) {
-            oldUser.setEmail(newUser.getEmail());
-        }
-
-        if (newUser.getLogin() != null) {
-            oldUser.setLogin(newUser.getLogin());
-        }
-
-        if (newUser.getBirthday() != null) {
-            oldUser.setBirthday(newUser.getBirthday());
-        }
-
-        if (newUser.getName() != null) {
-            if (newUser.getName().isBlank()) {
-                oldUser.setName(oldUser.getLogin());
-            } else {
-                oldUser.setName(newUser.getName());
-            }
-        }
-
-        log.info("Обновлён пользователь: id={}, email={}, login={}",
-                oldUser.getId(), oldUser.getEmail(), oldUser.getLogin());
-
-        return oldUser;
+    public User update(@RequestBody User user) {
+        return userService.update(user);
     }
 
-    private void validateUserForCreate(User user) {
-        String email = user.getEmail();
-        String login = user.getLogin();
-        LocalDate birthday = user.getBirthday();
-
-        if (email == null || email.isBlank() || !email.contains("@")) {
-            log.warn("Ошибка валидации пользователя: некорректный email={}", email);
-            throw new ValidationException("Электронная почта не может быть пустой и должна содержать символ @");
-        }
-
-        if (login == null || login.isBlank() || login.contains(" ")) {
-            log.warn("Ошибка валидации пользователя: некорректный login={}", login);
-            throw new ValidationException("Логин не может быть пустым и содержать пробелы");
-        }
-
-        if (birthday == null || birthday.isAfter(LocalDate.now())) {
-            log.warn("Ошибка валидации пользователя: некорректная дата рождения={}", birthday);
-            throw new ValidationException("Дата рождения не может быть в будущем");
-        }
+    @PutMapping("/{id}/friends/{friendId}")
+    public void addFriend(@PathVariable long id, @PathVariable long friendId) {
+        userService.addFriend(id, friendId);
     }
 
-    private void validateUserForUpdate(User user) {
-        String email = user.getEmail();
-        String login = user.getLogin();
-        LocalDate birthday = user.getBirthday();
-
-        if (email != null) {
-            if (email.isBlank() || !email.contains("@")) {
-                log.warn("Ошибка валидации пользователя: некорректный email={}", email);
-                throw new ValidationException("Некорректный email");
-            }
-        }
-
-        if (login != null) {
-            if (login.isBlank() || login.contains(" ")) {
-                log.warn("Ошибка валидации пользователя: некорректный login={}", login);
-                throw new ValidationException("Некорректный login");
-            }
-        }
-
-        if (birthday != null) {
-            if (birthday.isAfter(LocalDate.now())) {
-                log.warn("Ошибка валидации пользователя: некорректная дата рождения={}", birthday);
-                throw new ValidationException("Дата рождения не может быть в будущем");
-            }
-        }
+    @DeleteMapping("/{id}/friends/{friendId}")
+    public void removeFriend(@PathVariable long id, @PathVariable long friendId) {
+        userService.removeFriend(id, friendId);
     }
 
-    // вспомогательный метод для генерации идентификатора нового пользователя
-    private long getNextId() {
-        long currentMaxId = users.keySet()
-                .stream()
-                .mapToLong(id -> id)
-                .max()
-                .orElse(0);
-        return ++currentMaxId;
+    @GetMapping("/{id}/friends")
+    public List<User> findFriends(@PathVariable long id) {
+        return userService.findFriends(id);
+    }
+
+    @GetMapping("/{id}/friends/common/{otherId}")
+    public List<User> findCommonFriends(@PathVariable long id, @PathVariable long otherId) {
+        return userService.findCommonFriends(id, otherId);
     }
 }

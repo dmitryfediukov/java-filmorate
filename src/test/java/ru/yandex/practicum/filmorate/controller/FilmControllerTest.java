@@ -2,6 +2,9 @@ package ru.yandex.practicum.filmorate.controller;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import ru.yandex.practicum.filmorate.service.FilmService;
+import ru.yandex.practicum.filmorate.storage.user.InMemoryUserStorage;
+import ru.yandex.practicum.filmorate.storage.film.InMemoryFilmStorage;
 import ru.yandex.practicum.filmorate.exception.NotFoundException;
 import ru.yandex.practicum.filmorate.exception.ValidationException;
 import ru.yandex.practicum.filmorate.model.Film;
@@ -17,7 +20,7 @@ class FilmControllerTest {
 
     @BeforeEach
     void setUp() {
-        controller = new FilmController();
+        controller = new FilmController(new FilmService(new InMemoryFilmStorage(), new InMemoryUserStorage()));
 
         film = new Film();
         film.setName("Avatar");
