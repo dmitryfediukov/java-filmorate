@@ -33,7 +33,7 @@ class SocialApiTest {
     }
 
     @Test
-    void friendshipIsMutualUniqueAndRemovedFromBothSides() throws Exception {
+    void friendshipIsOneSidedUniqueAndCanBeRemoved() throws Exception {
         long first = createUser("first");
         long second = createUser("second");
         mvc.perform(put("/users/{id}/friends/{friendId}", first, second)).andExpect(status().isOk());
@@ -42,7 +42,7 @@ class SocialApiTest {
                 .andExpect(jsonPath("$", hasSize(1)))
                 .andExpect(jsonPath("$[0].id").value(second));
         mvc.perform(get("/users/{id}/friends", second))
-                .andExpect(jsonPath("$[0].id").value(first));
+                .andExpect(jsonPath("$", hasSize(0)));
         mvc.perform(delete("/users/{id}/friends/{friendId}", first, second)).andExpect(status().isOk());
         mvc.perform(delete("/users/{id}/friends/{friendId}", first, second)).andExpect(status().isOk());
         mvc.perform(get("/users/{id}/friends", first)).andExpect(jsonPath("$", hasSize(0)));

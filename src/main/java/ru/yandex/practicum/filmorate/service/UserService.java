@@ -2,6 +2,7 @@ package ru.yandex.practicum.filmorate.service;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 import ru.yandex.practicum.filmorate.exception.DuplicatedDataException;
 import ru.yandex.practicum.filmorate.exception.ValidationException;
@@ -18,7 +19,7 @@ public class UserService {
     private final UserStorage userStorage;
 
     @Autowired
-    public UserService(UserStorage userStorage) {
+    public UserService(@Qualifier("userDbStorage") UserStorage userStorage) {
         this.userStorage = userStorage;
     }
 
@@ -54,21 +55,19 @@ public class UserService {
     }
 
     public void addFriend(long id, long friendId) {
-        User user = userStorage.findById(id);
-        User friend = userStorage.findById(friendId);
+        userStorage.findById(id);
+        userStorage.findById(friendId);
         if (id == friendId) {
             throw new ValidationException("Нельзя добавить себя в друзья");
         }
-        user.getFriends().add(friendId);
-        friend.getFriends().add(id);
+        userStorage.addFriend(id, friendId);
         log.info("Добавлена дружба: userId={}, friendId={}", id, friendId);
     }
 
     public void removeFriend(long id, long friendId) {
-        User user = userStorage.findById(id);
-        User friend = userStorage.findById(friendId);
-        user.getFriends().remove(friendId);
-        friend.getFriends().remove(id);
+        userStorage.findById(id);
+        userStorage.findById(friendId);
+        userStorage.removeFriend(id, friendId);
         log.info("Удалена дружба: userId={}, friendId={}", id, friendId);
     }
 
