@@ -87,7 +87,7 @@ class StorageJdbcTest {
         Film incoming = film("First", 1);
         incoming.setGenres(new LinkedHashSet<>(Set.of(genre(1), genre(2))));
         Film created = films.create(incoming);
-        assertThat(created.getMpa().getName()).isEqualTo("0+");
+        assertThat(created.getMpa().getName()).isEqualTo("G");
         assertThat(created.getGenres()).extracting(Genre::getName)
                 .containsExactly("Комедия", "Драма");
         assertThat(films.findById(created.getId()).getGenres()).hasSize(2);
@@ -131,8 +131,8 @@ class StorageJdbcTest {
         assertThat(genres.findAll()).hasSize(6);
         assertThat(genres.findById(1).getName()).isEqualTo("Комедия");
         assertThat(mpaRatings.findAll()).extracting(Mpa::getName)
-                .containsExactly("0+", "6+", "12+", "16+", "18+");
-        assertThat(mpaRatings.findById(5).getName()).isEqualTo("18+");
+                .containsExactly("G", "PG", "PG-13", "R", "NC-17");
+        assertThat(mpaRatings.findById(5).getName()).isEqualTo("NC-17");
         assertThatThrownBy(() -> genres.findById(999)).isInstanceOf(NotFoundException.class);
         assertThatThrownBy(() -> mpaRatings.findById(999)).isInstanceOf(NotFoundException.class);
     }
