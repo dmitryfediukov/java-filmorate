@@ -1,5 +1,6 @@
 package ru.yandex.practicum.filmorate.storage.film;
 
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 import ru.yandex.practicum.filmorate.exception.NotFoundException;
 import ru.yandex.practicum.filmorate.model.Film;
@@ -7,9 +8,13 @@ import ru.yandex.practicum.filmorate.model.Film;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.Comparator;
+import java.util.List;
 import java.util.Map;
 
 @Component
+@Profile("memory")
 public class InMemoryFilmStorage implements FilmStorage {
     private final Map<Long, Film> films = new LinkedHashMap<>();
     private long nextId = 1;
@@ -30,6 +35,9 @@ public class InMemoryFilmStorage implements FilmStorage {
 
     @Override
     public Film create(Film film) {
+        if (film.getGenres() == null) {
+            film.setGenres(new LinkedHashSet<>());
+        }
         film.setId(nextId++);
         films.put(film.getId(), film);
         return film;
@@ -50,6 +58,12 @@ public class InMemoryFilmStorage implements FilmStorage {
         if (film.getDuration() > 0) {
             saved.setDuration(film.getDuration());
         }
+        if (film.getMpa() != null) {
+            saved.setMpa(film.getMpa());
+        }
+        if (film.getGenres() != null) {
+            saved.setGenres(film.getGenres());
+        }
         return saved;
     }
 
@@ -57,5 +71,24 @@ public class InMemoryFilmStorage implements FilmStorage {
     public void delete(long id) {
         findById(id);
         films.remove(id);
+    }
+
+    @Override
+    public void addLike(long filmId, long userId) {
+        findById(filmId).getLikes().add(userId);
+    }
+
+    @Override
+    public void removeLike(long filmId, long userId) {
+        findById(filmId).getLikes().remove(userId);
+    }
+
+    @Override
+    public List<Film> findPopular(int count) {
+        return films.values().stream()
+                .sorted(Comparator.<Film>comparingInt(film -> film.getLikes().size())
+                        .reversed().thenComparing(Film::getId))
+                .limit(count)
+                .toList();
     }
 }
