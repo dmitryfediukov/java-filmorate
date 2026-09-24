@@ -47,19 +47,40 @@ CREATE TABLE IF NOT EXISTS likes (
 
 CREATE INDEX IF NOT EXISTS idx_likes_user ON likes(user_id);
 
-CREATE TABLE IF NOT EXISTS friendships (
+-- Переносим данные из прежней схемы с одной строкой на пару пользователей.
+ALTER TABLE IF EXISTS friendships RENAME TO friendships_legacy;
+
+CREATE TABLE IF NOT EXISTS friendships_legacy (
     user_low_id BIGINT NOT NULL,
     user_high_id BIGINT NOT NULL,
     requested_by_user_id BIGINT NOT NULL,
-    status VARCHAR(10) NOT NULL CHECK (status IN ('PENDING', 'CONFIRMED')),
-    PRIMARY KEY (user_low_id, user_high_id),
-    CONSTRAINT fk_friendships_low FOREIGN KEY (user_low_id) REFERENCES users(id) ON DELETE CASCADE,
-    CONSTRAINT fk_friendships_high FOREIGN KEY (user_high_id) REFERENCES users(id) ON DELETE CASCADE,
-    CONSTRAINT fk_friendships_requester FOREIGN KEY (requested_by_user_id) REFERENCES users(id) ON DELETE CASCADE,
-    CONSTRAINT chk_friendships_pair CHECK (user_low_id < user_high_id),
-    CONSTRAINT chk_friendships_requester CHECK
-        (requested_by_user_id IN (user_low_id, user_high_id))
+    status VARCHAR(10) NOT NULL,
+    PRIMARY KEY (user_low_id, user_high_id)
 );
 
-CREATE INDEX IF NOT EXISTS idx_friendships_high_status ON friendships(user_high_id, status);
-CREATE INDEX IF NOT EXISTS idx_friendships_low_status ON friendships(user_low_id, status);
+CREATE TABLE IF NOT EXISTS friendships_directed (
+    user_id BIGINT NOT NULL,
+    friend_id BIGINT NOT NULL,
+    status VARCHAR(10) NOT NULL CHECK (status IN ('PENDING', 'CONFIRMED')),
+    PRIMARY KEY (user_id, friend_id),
+    CONSTRAINT fk_friendships_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    CONSTRAINT fk_friendships_friend FOREIGN KEY (friend_id) REFERENCES users(id) ON DELETE CASCADE,
+    CONSTRAINT chk_friendships_directed_pair CHECK (user_id <> friend_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_friendships_friend ON friendships_directed(friend_id);
+
+MERGE INTO friendships_directed (user_id, friend_id, status) KEY(user_id, friend_id)
+SELECT requested_by_user_id,
+       CASE WHEN requested_by_user_id = user_low_id THEN user_high_id ELSE user_low_id END,
+       status
+FROM friendships_legacy;
+
+MERGE INTO friendships_directed (user_id, friend_id, status) KEY(user_id, friend_id)
+SELECT CASE WHEN requested_by_user_id = user_low_id THEN user_high_id ELSE user_low_id END,
+       requested_by_user_id,
+       status
+FROM friendships_legacy
+WHERE status = 'CONFIRMED';
+
+DROP TABLE IF EXISTS friendships_legacy;

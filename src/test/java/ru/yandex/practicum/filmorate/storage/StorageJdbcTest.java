@@ -67,18 +67,20 @@ class StorageJdbcTest {
         users.addFriend(first, second);
         assertThat(users.findById(first).getFriends()).containsExactly(second);
         assertThat(users.findById(second).getFriends()).isEmpty();
-        assertThat(jdbc.queryForObject("SELECT status FROM friendships", String.class)).isEqualTo("PENDING");
+        assertThat(jdbc.queryForObject("SELECT status FROM friendships_directed", String.class)).isEqualTo("PENDING");
 
         users.addFriend(second, first);
         assertThat(users.findById(second).getFriends()).containsExactly(first);
-        assertThat(jdbc.queryForObject("SELECT status FROM friendships", String.class)).isEqualTo("CONFIRMED");
+        assertThat(jdbc.queryForList("SELECT status FROM friendships_directed ORDER BY user_id", String.class))
+                .containsExactly("CONFIRMED", "CONFIRMED");
 
         users.removeFriend(first, second);
         assertThat(users.findById(first).getFriends()).isEmpty();
         assertThat(users.findById(second).getFriends()).containsExactly(first);
+        assertThat(jdbc.queryForObject("SELECT status FROM friendships_directed", String.class)).isEqualTo("PENDING");
         users.removeFriend(second, first);
         users.removeFriend(second, first);
-        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM friendships", Integer.class)).isZero();
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM friendships_directed", Integer.class)).isZero();
     }
 
     @Test

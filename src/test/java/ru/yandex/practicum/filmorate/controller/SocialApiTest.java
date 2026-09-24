@@ -11,6 +11,8 @@ import ru.yandex.practicum.filmorate.service.UserService;
 import ru.yandex.practicum.filmorate.storage.film.InMemoryFilmStorage;
 import ru.yandex.practicum.filmorate.storage.user.InMemoryUserStorage;
 
+import java.nio.charset.StandardCharsets;
+
 import static org.hamcrest.Matchers.hasSize;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.mock;
@@ -179,7 +181,7 @@ class SocialApiTest {
                 .setControllerAdvice(new ErrorHandler()).build();
         String body = failingMvc.perform(get("/users/1"))
                 .andExpect(status().isInternalServerError())
-                .andReturn().getResponse().getContentAsString(java.nio.charset.StandardCharsets.UTF_8);
+                .andReturn().getResponse().getContentAsString(StandardCharsets.UTF_8);
         assertEquals("Внутренняя ошибка сервера", mapper.readTree(body).get("error").asText());
     }
 

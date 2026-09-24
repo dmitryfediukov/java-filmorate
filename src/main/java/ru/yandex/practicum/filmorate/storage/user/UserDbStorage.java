@@ -9,11 +9,33 @@ import ru.yandex.practicum.filmorate.exception.NotFoundException;
 import ru.yandex.practicum.filmorate.model.User;
 
 import java.sql.Date;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.time.LocalDate;
 import java.util.Collection;
 import java.util.List;
 
 @Repository
 public class UserDbStorage implements UserStorage {
+    private static final String SELECT_ALL_USERS = "SELECT id, email, login, name, birthday FROM users ORDER BY id";
+    private static final String SELECT_USER_BY_ID = "SELECT id, email, login, name, birthday FROM users WHERE id = ?";
+    private static final String INSERT_USER = "INSERT INTO users (email, login, name, birthday) VALUES (?, ?, ?, ?)";
+    private static final String UPDATE_USER =
+            "UPDATE users SET email = ?, login = ?, name = ?, birthday = ? WHERE id = ?";
+    private static final String DELETE_USER = "DELETE FROM users WHERE id = ?";
+    private static final String SELECT_FRIENDS =
+            "SELECT friend_id FROM friendships_directed WHERE user_id = ? ORDER BY friend_id";
+    private static final String SELECT_REVERSE_FRIENDSHIP =
+            "SELECT COUNT(*) FROM friendships_directed WHERE user_id = ? AND friend_id = ?";
+    private static final String UPSERT_FRIENDSHIP =
+            "MERGE INTO friendships_directed (user_id, friend_id, status) KEY(user_id, friend_id) VALUES (?, ?, ?)";
+    private static final String CONFIRM_FRIENDSHIP =
+            "UPDATE friendships_directed SET status = 'CONFIRMED' WHERE user_id = ? AND friend_id = ?";
+    private static final String DELETE_FRIENDSHIP =
+            "DELETE FROM friendships_directed WHERE user_id = ? AND friend_id = ?";
+    private static final String RESET_FRIENDSHIP =
+            "UPDATE friendships_directed SET status = 'PENDING' WHERE user_id = ? AND friend_id = ?";
     private final JdbcTemplate jdbc;
 
     public UserDbStorage(JdbcTemplate jdbc) {
@@ -22,13 +44,13 @@ public class UserDbStorage implements UserStorage {
 
     @Override
     public Collection<User> findAll() {
-        return jdbc.query("SELECT id, email, login, name, birthday FROM users ORDER BY id",
+        return jdbc.query(SELECT_ALL_USERS,
                 (rs, rowNum) -> mapUser(rs));
     }
 
     @Override
     public User findById(long id) {
-        List<User> found = jdbc.query("SELECT id, email, login, name, birthday FROM users WHERE id = ?",
+        List<User> found = jdbc.query(SELECT_USER_BY_ID,
                 (rs, rowNum) -> mapUser(rs), id);
         if (found.isEmpty()) {
             throw new NotFoundException("Пользователь с id = " + id + " не найден");
@@ -40,8 +62,7 @@ public class UserDbStorage implements UserStorage {
     public User create(User user) {
         KeyHolder keys = new GeneratedKeyHolder();
         jdbc.update(connection -> {
-            java.sql.PreparedStatement statement = connection.prepareStatement(
-                    "INSERT INTO users (email, login, name, birthday) VALUES (?, ?, ?, ?)", new String[]{"ID"});
+            PreparedStatement statement = connection.prepareStatement(INSERT_USER, new String[]{"ID"});
             statement.setString(1, user.getEmail());
             statement.setString(2, user.getLogin());
             statement.setString(3, user.getName());
@@ -61,8 +82,8 @@ public class UserDbStorage implements UserStorage {
         if (name.isBlank()) {
             name = login;
         }
-        java.time.LocalDate birthday = update.getBirthday() == null ? saved.getBirthday() : update.getBirthday();
-        jdbc.update("UPDATE users SET email = ?, login = ?, name = ?, birthday = ? WHERE id = ?",
+        LocalDate birthday = update.getBirthday() == null ? saved.getBirthday() : update.getBirthday();
+        jdbc.update(UPDATE_USER,
                 email, login, name, Date.valueOf(birthday), update.getId());
         return findById(update.getId());
     }
@@ -70,7 +91,7 @@ public class UserDbStorage implements UserStorage {
     @Override
     public void delete(long id) {
         findById(id);
-        jdbc.update("DELETE FROM users WHERE id = ?", id);
+        jdbc.update(DELETE_USER, id);
     }
 
     @Override
@@ -78,19 +99,11 @@ public class UserDbStorage implements UserStorage {
     public void addFriend(long userId, long friendId) {
         findById(userId);
         findById(friendId);
-        long low = Math.min(userId, friendId);
-        long high = Math.max(userId, friendId);
-        List<Friendship> rows = jdbc.query(
-                "SELECT requested_by_user_id, status FROM friendships WHERE user_low_id = ? AND user_high_id = ?",
-                (rs, rowNum) -> new Friendship(rs.getLong("requested_by_user_id"), rs.getString("status")),
-                low, high);
-        if (rows.isEmpty()) {
-            jdbc.update("INSERT INTO friendships (user_low_id, user_high_id, requested_by_user_id, status)"
-                    + " VALUES (?, ?, ?, 'PENDING')", low, high, userId);
-        } else if (rows.getFirst().requester() != userId && rows.getFirst().status().equals("PENDING")) {
-            jdbc.update("UPDATE friendships SET status = 'CONFIRMED' WHERE user_low_id = ? AND user_high_id = ?",
-                    low, high);
+        boolean reciprocal = jdbc.queryForObject(SELECT_REVERSE_FRIENDSHIP, Integer.class, friendId, userId) > 0;
+        if (reciprocal) {
+            jdbc.update(CONFIRM_FRIENDSHIP, friendId, userId);
         }
+        jdbc.update(UPSERT_FRIENDSHIP, userId, friendId, reciprocal ? "CONFIRMED" : "PENDING");
     }
 
     @Override
@@ -98,40 +111,19 @@ public class UserDbStorage implements UserStorage {
     public void removeFriend(long userId, long friendId) {
         findById(userId);
         findById(friendId);
-        long low = Math.min(userId, friendId);
-        long high = Math.max(userId, friendId);
-        List<Friendship> rows = jdbc.query(
-                "SELECT requested_by_user_id, status FROM friendships WHERE user_low_id = ? AND user_high_id = ?",
-                (rs, rowNum) -> new Friendship(rs.getLong("requested_by_user_id"), rs.getString("status")),
-                low, high);
-        if (rows.isEmpty()) {
-            return;
-        }
-        Friendship friendship = rows.getFirst();
-        if (friendship.status().equals("CONFIRMED")) {
-            jdbc.update("UPDATE friendships SET status = 'PENDING', requested_by_user_id = ?"
-                    + " WHERE user_low_id = ? AND user_high_id = ?", friendId, low, high);
-        } else if (friendship.requester() == userId) {
-            jdbc.update("DELETE FROM friendships WHERE user_low_id = ? AND user_high_id = ?", low, high);
+        if (jdbc.update(DELETE_FRIENDSHIP, userId, friendId) > 0) {
+            jdbc.update(RESET_FRIENDSHIP, friendId, userId);
         }
     }
 
-    private User mapUser(java.sql.ResultSet rs) throws java.sql.SQLException {
+    private User mapUser(ResultSet rs) throws SQLException {
         User user = new User();
         user.setId(rs.getLong("id"));
         user.setEmail(rs.getString("email"));
         user.setLogin(rs.getString("login"));
         user.setName(rs.getString("name"));
         user.setBirthday(rs.getDate("birthday").toLocalDate());
-        user.getFriends().addAll(jdbc.queryForList(
-                "SELECT CASE WHEN user_low_id = ? THEN user_high_id ELSE user_low_id END"
-                        + " FROM friendships WHERE (user_low_id = ? OR user_high_id = ?)"
-                        + " AND (status = 'CONFIRMED' OR requested_by_user_id = ?)"
-                        + " ORDER BY 1",
-                Long.class, user.getId(), user.getId(), user.getId(), user.getId()));
+        user.getFriends().addAll(jdbc.queryForList(SELECT_FRIENDS, Long.class, user.getId()));
         return user;
-    }
-
-    private record Friendship(long requester, String status) {
     }
 }
