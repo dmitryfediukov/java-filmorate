@@ -1,5 +1,6 @@
 package ru.yandex.practicum.filmorate.storage.user;
 
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 import ru.yandex.practicum.filmorate.exception.NotFoundException;
 import ru.yandex.practicum.filmorate.model.User;
@@ -10,6 +11,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 @Component
+@Profile("memory")
 public class InMemoryUserStorage implements UserStorage {
     private final Map<Long, User> users = new LinkedHashMap<>();
     private long nextId = 1;
@@ -57,5 +59,15 @@ public class InMemoryUserStorage implements UserStorage {
     public void delete(long id) {
         findById(id);
         users.remove(id);
+    }
+
+    @Override
+    public void addFriend(long userId, long friendId) {
+        findById(userId).getFriends().add(friendId);
+    }
+
+    @Override
+    public void removeFriend(long userId, long friendId) {
+        findById(userId).getFriends().remove(friendId);
     }
 }

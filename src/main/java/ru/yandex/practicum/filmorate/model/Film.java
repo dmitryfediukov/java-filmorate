@@ -17,6 +17,8 @@ public class Film {
     private String description;
     private LocalDate releaseDate;
     private int duration;
+    private Mpa mpa;
+    private Set<Genre> genres;
     @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     private final Set<Long> likes = new HashSet<>();
 }

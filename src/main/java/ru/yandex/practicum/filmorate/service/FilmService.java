@@ -2,6 +2,7 @@ package ru.yandex.practicum.filmorate.service;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 import ru.yandex.practicum.filmorate.exception.ValidationException;
 import ru.yandex.practicum.filmorate.model.Film;
@@ -10,8 +11,8 @@ import ru.yandex.practicum.filmorate.storage.user.UserStorage;
 
 import java.time.LocalDate;
 import java.util.Collection;
-import java.util.Comparator;
 import java.util.List;
+import java.util.LinkedHashSet;
 
 @Slf4j
 @Service
@@ -22,7 +23,8 @@ public class FilmService {
     private final UserStorage userStorage;
 
     @Autowired
-    public FilmService(FilmStorage filmStorage, UserStorage userStorage) {
+    public FilmService(@Qualifier("filmDbStorage") FilmStorage filmStorage,
+                       @Qualifier("userDbStorage") UserStorage userStorage) {
         this.filmStorage = filmStorage;
         this.userStorage = userStorage;
     }
@@ -37,6 +39,9 @@ public class FilmService {
 
     public Film create(Film film) {
         validateFilm(film, true);
+        if (film.getGenres() == null) {
+            film.setGenres(new LinkedHashSet<>());
+        }
         Film created = filmStorage.create(film);
         log.info("Создан фильм: id={}", created.getId());
         return created;
@@ -54,16 +59,16 @@ public class FilmService {
     }
 
     public void addLike(long id, long userId) {
-        Film film = filmStorage.findById(id);
+        filmStorage.findById(id);
         userStorage.findById(userId);
-        film.getLikes().add(userId);
+        filmStorage.addLike(id, userId);
         log.info("Добавлен лайк: filmId={}, userId={}", id, userId);
     }
 
     public void removeLike(long id, long userId) {
-        Film film = filmStorage.findById(id);
+        filmStorage.findById(id);
         userStorage.findById(userId);
-        film.getLikes().remove(userId);
+        filmStorage.removeLike(id, userId);
         log.info("Удалён лайк: filmId={}, userId={}", id, userId);
     }
 
@@ -71,12 +76,7 @@ public class FilmService {
         if (count < 0) {
             throw new ValidationException("Количество фильмов не может быть отрицательным");
         }
-        return filmStorage.findAll().stream()
-                .sorted(Comparator.<Film>comparingInt(film -> film.getLikes().size())
-                        .reversed()
-                        .thenComparing(Film::getId))
-                .limit(count)
-                .toList();
+        return filmStorage.findPopular(count);
     }
 
     private void validateFilm(Film film, boolean isCreate) {
